@@ -480,6 +480,93 @@ var Zotero_LocateMenu = new function () {
 	ViewOptions.viewAttachmentInWindow = new ViewAttachment(true);
 
 	/**
+	 * "Open with System" option
+	 *
+	 * Opens the attachment using the system's default application
+	 */
+	ViewOptions.viewAttachmentWithSystem = new function () {
+		this._attachmentType = "mixed";
+		this._numAttachments = 0;
+
+		Object.defineProperty(this, "className", {
+			get() {
+				switch (this._attachmentType) {
+					case "pdf":
+						return "zotero-menuitem-attachments-pdf";
+					case "epub":
+						return "zotero-menuitem-attachments-epub";
+					case "snapshot":
+						return "zotero-menuitem-attachments-snapshot";
+					default:
+						return "zotero-menuitem-view-external";
+				}
+			},
+		});
+
+		this.l10nId = "item-menu-viewAttachment";
+		Object.defineProperty(this, "l10nArgs", {
+			get: () => {
+				return {
+					attachmentType: this._attachmentType,
+					numAttachments: this._numAttachments,
+					openIn: "system",
+				};
+			}
+		});
+
+		this.canHandleItem = async function (item) {
+			return await _getFirstFileAttachment(item) !== null;
+		};
+
+		this.updateMenuItem = async function (items) {
+			let attachmentType = null;
+			let numAttachments = 0;
+			for (let item of items) {
+				let attachment = await _getFirstFileAttachment(item);
+				let thisAttachmentType = attachment?.attachmentReaderType;
+				if (!thisAttachmentType) {
+					continue;
+				}
+
+				if (attachmentType === null) {
+					attachmentType = thisAttachmentType;
+				}
+				else if (attachmentType !== thisAttachmentType) {
+					attachmentType = "mixed";
+				}
+
+				numAttachments++;
+			}
+			this._attachmentType = attachmentType;
+			this._numAttachments = numAttachments;
+		};
+
+		this.handleItems = async function (items, _event) {
+			for (let item of items) {
+				var attachment = await _getFirstFileAttachment(item);
+				if (attachment) {
+					let path = await attachment.getFilePathAsync();
+					if (path) {
+						Zotero.launchFile(path);
+					}
+				}
+			}
+		};
+
+		var _getFirstFileAttachment = async function (item) {
+			var attachments = item.isAttachment() ? [item] : ((await item.getBestAttachments()));
+			for (let i = 0; i < attachments.length; i++) {
+				let attachment = attachments[i];
+				if (attachment.attachmentReaderType
+						&& attachment.attachmentLinkMode !== Zotero.Attachments.LINK_MODE_LINKED_URL) {
+					return attachment;
+				}
+			}
+			return null;
+		};
+	};
+
+	/**
 	 * "View Online" option
 	 *
 	 * Should appear only when an item or an attachment has a URL

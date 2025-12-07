@@ -69,8 +69,40 @@ Zotero.Utilities.Internal = {
 			.getService(Components.interfaces.nsIClipboardHelper)
 			.copyString(str);
 	},
-	
-	
+
+
+	/**
+	 * Format file size in human-readable format
+	 *
+	 * @param {Number} bytes - Size in bytes
+	 * @return {String} - Formatted size (e.g., "1.5 MB")
+	 */
+	formatFileSize: function (bytes) {
+		if (bytes === null || bytes === undefined || bytes === "") {
+			return "";
+		}
+
+		bytes = parseInt(bytes);
+		if (isNaN(bytes) || bytes < 0) {
+			return "";
+		}
+
+		const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+		let unitIndex = 0;
+		let size = bytes;
+
+		while (size >= 1024 && unitIndex < units.length - 1) {
+			size /= 1024;
+			unitIndex++;
+		}
+
+		// Show 0 decimal places for bytes, 1 for KB, 2 for larger
+		let decimals = unitIndex === 0 ? 0 : (unitIndex === 1 ? 1 : 2);
+
+		return size.toFixed(decimals) + ' ' + units[unitIndex];
+	},
+
+
 	/*
 	 * Adapted from http://developer.mozilla.org/en/docs/nsICryptoHash
 	 *

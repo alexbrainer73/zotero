@@ -285,6 +285,52 @@ Zotero.CollectionTreeRow.prototype.getTrashedCollections = async function () {
 };
 
 
+/**
+ * Returns the item count for this row.
+ * For collections, respects the recursiveCollections preference.
+ *
+ * @return {Promise<number|null>} Item count, or null if not applicable
+ */
+Zotero.CollectionTreeRow.prototype.getItemCount = async function () {
+	// Regular collections
+	if (this.isCollection()) {
+		let collection = this.ref;
+		let recursive = Zotero.Prefs.get('recursiveCollections');
+
+		if (recursive) {
+			// Get all items including subcollections
+			let descendents = collection.getDescendents(false, 'item');
+			return descendents.length;
+		}
+		else {
+			// Direct items only
+			return collection.getChildItems(true).length;
+		}
+	}
+
+	// Library root (My Library, group libraries)
+	if (this.isLibrary(true)) {
+		let libraryID = this.ref.libraryID;
+		// Count only regular items (exclude attachments, notes, annotations, and deleted items)
+		let sql = "SELECT COUNT(*) FROM items WHERE libraryID = ? "
+			+ "AND itemTypeID NOT IN (SELECT itemTypeID FROM itemTypes "
+			+ "WHERE typeName IN ('attachment', 'note', 'annotation')) "
+			+ "AND itemID NOT IN (SELECT itemID FROM deletedItems)";
+		return await Zotero.DB.valueQueryAsync(sql, [libraryID]);
+	}
+
+	// Virtual collections (Unfiled, Duplicates, Retracted)
+	if (this.isUnfiled() || this.isDuplicates() || this.isRetracted()) {
+		let search = await this.getSearchObject();
+		let ids = await search.search();
+		return ids.length;
+	}
+
+	// Feeds, Trash, etc. - no count
+	return null;
+};
+
+
 Zotero.CollectionTreeRow.prototype.getItems = async function () {
 	switch (this.type) {
 		// Fake results if this is a shared library

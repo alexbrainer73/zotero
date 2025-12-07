@@ -182,6 +182,7 @@ item-menu-viewAttachment =
         } { $openIn ->
             [tab] em uma nova aba
             [window] em uma nova janela
+            [system] com Sistema
            *[other] { "" }
         }
 item-menu-add-file =
@@ -555,6 +556,7 @@ attachment-info-title = Título
 attachment-info-filename = Nome do arquivo
 attachment-info-accessed = Acessado em
 attachment-info-pages = Páginas
+attachment-info-size = Tamanho
 attachment-info-modified = Data de modificação
 attachment-info-index = Indexado
 attachment-info-convert-note =

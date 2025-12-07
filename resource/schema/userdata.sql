@@ -1,4 +1,4 @@
--- 123
+-- 124
 
 -- Copyright (c) 2009 Center for History and New Media
 --                    George Mason University, Fairfax, Virginia, USA
@@ -211,6 +211,7 @@ CREATE TABLE itemAttachments (
     storageModTime INT,
     storageHash TEXT,
     lastProcessedModificationTime INT,
+    fileSize INT,
     FOREIGN KEY (itemID) REFERENCES items(itemID) ON DELETE CASCADE,
     FOREIGN KEY (parentItemID) REFERENCES items(itemID) ON DELETE CASCADE,
     FOREIGN KEY (charsetID) REFERENCES charsets(charsetID) ON DELETE SET NULL

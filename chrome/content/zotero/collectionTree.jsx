@@ -75,6 +75,8 @@ var CollectionTree = class CollectionTree extends LibraryTree {
 			this,
 			[
 				'collection',
+				'collection-item',
+				'item',
 				'search',
 				'feed',
 				'share',
@@ -112,7 +114,11 @@ var CollectionTree = class CollectionTree extends LibraryTree {
 		this._expandedRowsOnDrag = new Set();
 		this._expandRowOnHoverTimer = null;
 		this._collapseExpandedRowsTimer = null;
-		
+
+		// Item count cache for collections, libraries, and virtual collections
+		this._itemCounts = new Map();
+		this._itemCountsLoading = false;
+
 		this.onLoad = this.createEventBinding('load', true, true);
 	}
 	
@@ -134,6 +140,8 @@ var CollectionTree = class CollectionTree extends LibraryTree {
 			await promise;
 		}
 		await this.runListeners('load');
+		// Load item counts for collections after the tree is ready
+		this._loadItemCounts();
 		Zotero.debug("React CollectionTree loaded");
 	}
 
@@ -413,8 +421,21 @@ var CollectionTree = class CollectionTree extends LibraryTree {
 		cell.appendChild(twisty);
 		cell.appendChild(icon);
 		cell.appendChild(label);
+
+		// Item count (aligned right)
+		let rowCountId = this._getRowCountId(treeRow);
+		if (rowCountId && treeRow != this._editing) {
+			let count = this._itemCounts.get(rowCountId);
+			if (count !== undefined && count !== null) {
+				let countSpan = document.createElement('span');
+				countSpan.className = 'item-count';
+				countSpan.textContent = count.toLocaleString();
+				cell.appendChild(countSpan);
+			}
+		}
+
 		div.appendChild(cell);
-		
+
 		// Accessibility
 		div.setAttribute('aria-level', depth+1);
 		if (!this.isContainerEmpty(index)) {
@@ -612,7 +633,75 @@ var CollectionTree = class CollectionTree extends LibraryTree {
 		await this.refresh();
 		this.tree.invalidate();
 	}
-	
+
+	/**
+	 * Get a unique identifier for a row for item count caching
+	 * @param {Zotero.CollectionTreeRow} treeRow
+	 * @return {string|null}
+	 */
+	_getRowCountId(treeRow) {
+		if (treeRow.isCollection()) {
+			return 'C' + treeRow.ref.id;
+		}
+		if (treeRow.isLibrary(true)) {
+			return 'L' + treeRow.ref.libraryID;
+		}
+		if (treeRow.isUnfiled()) {
+			return 'U' + treeRow.ref.libraryID;
+		}
+		if (treeRow.isDuplicates()) {
+			return 'D' + treeRow.ref.libraryID;
+		}
+		if (treeRow.isRetracted()) {
+			return 'R' + treeRow.ref.libraryID;
+		}
+		return null;
+	}
+
+	/**
+	 * Load item counts for all applicable rows in the tree
+	 * @param {boolean} [invalidate=true] - Whether to invalidate the tree after loading
+	 */
+	async _loadItemCounts(invalidate = true) {
+		if (this._itemCountsLoading) {
+			return;
+		}
+		this._itemCountsLoading = true;
+
+		try {
+			for (let row of this._rows) {
+				let rowId = this._getRowCountId(row);
+				if (rowId) {
+					let count = await row.getItemCount();
+					if (count !== null) {
+						this._itemCounts.set(rowId, count);
+					}
+				}
+			}
+
+			if (invalidate && this.tree) {
+				this.tree.invalidate();
+			}
+		}
+		catch (e) {
+			Zotero.logError(e);
+		}
+		finally {
+			this._itemCountsLoading = false;
+		}
+	}
+
+	/**
+	 * Invalidate item counts for specific row IDs and reload
+	 * @param {string[]} rowIds - Array of row IDs to invalidate
+	 */
+	async _invalidateItemCounts(rowIds) {
+		for (let id of rowIds) {
+			this._itemCounts.delete(id);
+		}
+		await this._loadItemCounts();
+	}
+
 	async selectByID(id, ensureRowVisible = true) {
 		var type = id[0];
 		id = parseInt(('' + id).substr(1));
@@ -805,7 +894,27 @@ var CollectionTree = class CollectionTree extends LibraryTree {
 			}
 			return;
 		}
-		
+
+		// Update item counts when collection-item associations change
+		if (type == 'collection-item' && (action == 'add' || action == 'remove')) {
+			// ids are collectionID-itemID pairs, extract unique collection IDs
+			let collectionIDs = new Set();
+			for (let id of ids) {
+				let collectionID = id.split('-')[0];
+				collectionIDs.add('C' + collectionID);
+			}
+			// Invalidate counts for affected collections and their parents (for recursive mode)
+			this._loadItemCounts();
+			return;
+		}
+
+		// Update item counts when items are added, deleted, or moved
+		if (type == 'item' && (action == 'add' || action == 'delete' || action == 'trash')) {
+			// Item counts may have changed, reload all counts
+			this._loadItemCounts();
+			return;
+		}
+
 		//
 		// Actions that can change the selection
 		//
@@ -1250,6 +1359,9 @@ var CollectionTree = class CollectionTree extends LibraryTree {
 		this._saveOpenStates();
 		this.tree.invalidate(index);
 		this._lastToggleOpenStateIndex = null;
+
+		// Load item counts for newly visible rows
+		this._loadItemCounts();
 	}
 
 	/**

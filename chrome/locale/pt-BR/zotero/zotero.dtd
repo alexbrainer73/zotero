@@ -57,6 +57,7 @@
 <!ENTITY zotero.items.creator_column "Autor">
 <!ENTITY zotero.items.year_column "Ano">
 <!ENTITY zotero.items.dateModified_column "Data de modificação">
+<!ENTITY zotero.items.attachmentSize "Tamanho">
 <!ENTITY zotero.items.moreColumns.label "Mais colunas">
 <!ENTITY zotero.items.restoreColumnOrder.label "Restaurar a ordem das colunas">
 

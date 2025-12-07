@@ -351,6 +351,17 @@ const COLUMNS = [
 		zoteroPersist: ["width", "hidden", "sortDirection"]
 	},
 	{
+		dataKey: "attachmentSize",
+		disabledIn: ["feeds", "feed"],
+		showInColumnPicker: true,
+		columnPickerSubMenu: true,
+		label: "zotero.items.attachmentSize",
+		sortReverse: true,
+		width: "70",
+		staticWidth: true,
+		zoteroPersist: ["width", "hidden", "sortDirection"]
+	},
+	{
 		dataKey: "feed",
 		disabledIn: ["default", "feed"],
 		showInColumnPicker: true,

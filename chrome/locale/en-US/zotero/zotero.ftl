@@ -200,6 +200,7 @@ item-menu-viewAttachment =
         $openIn ->
             [tab] in New Tab
             [window] in New Window
+            [system] with System App
             *[other] { "" }
     }
 
@@ -631,6 +632,7 @@ attachment-info-title = Title
 attachment-info-filename = Filename
 attachment-info-accessed = Accessed
 attachment-info-pages = Pages
+attachment-info-size = Size
 attachment-info-modified = Modified
 attachment-info-index = Indexed
 attachment-info-convert-note =

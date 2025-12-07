@@ -3478,7 +3478,11 @@ Zotero.Schema = new function () {
 			else if (i == 123) {
 				await Zotero.DB.queryAsync("CREATE INDEX itemData_valueID ON itemData(valueID)");
 			}
-			
+
+			else if (i == 124) {
+				await Zotero.DB.queryAsync("ALTER TABLE itemAttachments ADD COLUMN fileSize INT");
+			}
+
 			// If breaking compatibility or doing anything dangerous, clear minorUpdateFrom
 		}
 		

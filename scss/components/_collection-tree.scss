@@ -97,15 +97,26 @@ $icons: (
 		// Stretch the cell to full height
 		align-self: stretch;
 
-		:not(.cell-text) {
+		:not(.cell-text):not(.item-count) {
 			flex-shrink: 0
 		}
 
 		.cell-text {
-			flex-shrink: 1;
+			flex: 1 1 auto;
+			min-width: 0; // Allows truncation
 			text-overflow: ellipsis;
 			overflow: hidden;
+			white-space: nowrap;
 			margin-left: 4px;
+		}
+
+		.item-count {
+			flex: 0 0 auto;
+			color: var(--fill-secondary);
+			font-size: 0.9em;
+			font-variant-numeric: tabular-nums;
+			margin-inline-start: 8px;
+			padding-inline-end: 4px;
 		}
 
 		input.cell-text {

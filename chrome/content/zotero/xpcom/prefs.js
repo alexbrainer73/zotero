@@ -347,7 +347,13 @@ Zotero.Prefs = new function () {
 			Zotero.UIProperties.setAll();
 		}],
 		["recursiveCollections", function () {
-			Zotero.getActiveZoteroPane().itemsView.refreshAndMaintainSelection();
+			let pane = Zotero.getActiveZoteroPane();
+			pane.itemsView.refreshAndMaintainSelection();
+			// Reload item counts since recursive setting changed
+			if (pane.collectionsView && pane.collectionsView._loadItemCounts) {
+				pane.collectionsView._itemCounts.clear();
+				pane.collectionsView._loadItemCounts();
+			}
 		}],
 		[ "layout", function (val) {
 			Zotero.getActiveZoteroPane().updateLayout();

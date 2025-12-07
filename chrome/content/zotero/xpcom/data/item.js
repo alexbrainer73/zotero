@@ -50,7 +50,8 @@ Zotero.Item = function (itemTypeOrID) {
 	this._attachmentSyncedModificationTime = null;
 	this._attachmentSyncedHash = null;
 	this._attachmentLastProcessedModificationTime = null;
-	
+	this._attachmentFileSize = null;
+
 	// loadCreators
 	this._creators = [];
 	this._creatorIDs = [];
@@ -361,6 +362,7 @@ Zotero.Item.prototype._parseRowData = function (row) {
 			case 'attachmentSyncedModificationTime':
 			case 'attachmentSyncedHash':
 			case 'attachmentLastProcessedModificationTime':
+			case 'attachmentFileSize':
 			case 'createdByUserID':
 			case 'lastModifiedByUserID':
 				break;
@@ -1905,13 +1907,13 @@ Zotero.Item.prototype._saveData = async function (env) {
 		let sql = "";
 		let cols = [
 			'parentItemID', 'linkMode', 'contentType', 'charsetID', 'path', 'syncState',
-			'storageModTime', 'storageHash', 'lastProcessedModificationTime'
+			'storageModTime', 'storageHash', 'lastProcessedModificationTime', 'fileSize'
 		];
 		// TODO: Replace with UPSERT after SQLite 3.24.0
 		if (isNew) {
 			sql = "INSERT INTO itemAttachments "
 				+ "(itemID, " + cols.join(", ") + ") "
-				+ "VALUES (?,?,?,?,?,?,?,?,?,?)";
+				+ "VALUES (?,?,?,?,?,?,?,?,?,?,?)";
 		}
 		else {
 			sql = "UPDATE itemAttachments SET " + cols.join("=?, ") + "=? WHERE itemID=?";
@@ -1926,11 +1928,12 @@ Zotero.Item.prototype._saveData = async function (env) {
 		let storageModTime = this.attachmentSyncedModificationTime;
 		let storageHash = this.attachmentSyncedHash;
 		let lastProcessedModificationTime = this.attachmentLastProcessedModificationTime;
-		
+		let fileSize = this.attachmentFileSize;
+
 		if (linkMode == Zotero.Attachments.LINK_MODE_LINKED_FILE && libraryType != 'user') {
 			throw new Error("Linked files can only be added to user library");
 		}
-		
+
 		let params = [
 			parentItemID,
 			{ int: linkMode },
@@ -1941,6 +1944,7 @@ Zotero.Item.prototype._saveData = async function (env) {
 			storageModTime !== undefined ? storageModTime : null,
 			storageHash || null,
 			lastProcessedModificationTime || null,
+			fileSize !== undefined && fileSize !== null ? { int: fileSize } : null,
 		];
 		if (isNew) {
 			params.unshift(itemID);
@@ -2504,6 +2508,29 @@ Zotero.Item.prototype.isPDFAttachment = function () {
  */
 Zotero.Item.prototype.isEPUBAttachment = function () {
 	return this.isFileAttachment() && this.attachmentContentType == 'application/epub+zip';
+};
+
+/**
+ * @return {Boolean} - Returns true if item is a stored or linked DJVU attachment
+ */
+Zotero.Item.prototype.isDJVUAttachment = function () {
+	return this.isFileAttachment() && this.attachmentContentType == 'image/vnd.djvu';
+};
+
+/**
+ * @return {Boolean} - Returns true if item is a stored or linked MOBI attachment
+ */
+Zotero.Item.prototype.isMobiAttachment = function () {
+	return this.isFileAttachment() && this.attachmentContentType == 'application/x-mobipocket-ebook';
+};
+
+/**
+ * @return {Boolean} - Returns true if item is a stored or linked CBR attachment
+ */
+Zotero.Item.prototype.isCBRAttachment = function () {
+	return this.isFileAttachment()
+		&& (this.attachmentContentType == 'application/vnd.comicbook-rar'
+			|| this.attachmentContentType == 'application/x-cbr');
 };
 
 /**
@@ -3563,6 +3590,41 @@ for (let name of ['lastProcessedModificationTime']) {
 }
 
 
+/**
+ * File size of an attachment in bytes
+ */
+Zotero.defineProperty(Zotero.Item.prototype, 'attachmentFileSize', {
+	get: function () {
+		if (!this.isFileAttachment()) {
+			return undefined;
+		}
+		return this._attachmentFileSize;
+	},
+	set: function (val) {
+		if (!this.isAttachment()) {
+			throw new Error("attachmentFileSize can only be set for attachment items");
+		}
+
+		if (val !== null && val !== undefined) {
+			val = parseInt(val);
+			if (isNaN(val) || val < 0) {
+				throw new Error("attachmentFileSize must be a positive integer or null");
+			}
+		}
+
+		if (this._attachmentFileSize === val) {
+			return;
+		}
+
+		if (!this._changed.attachmentData) {
+			this._changed.attachmentData = {};
+		}
+		this._changed.attachmentData.fileSize = true;
+		this._attachmentFileSize = val !== undefined ? val : null;
+	}
+});
+
+
 Zotero.Item.prototype.getAttachmentLastPageIndex = function () {
 	if (!this.isFileAttachment()) {
 		throw new Error("getAttachmentLastPageIndex() can only be called on file attachments");
@@ -3878,12 +3940,20 @@ Zotero.Item.prototype.getBestAttachments = async function () {
 	var url = this.getField('url');
 	var urlFieldID = Zotero.ItemFields.getID('url');
 	
+	// Priority order: PDF > EPUB > DJVU > MOBI > CBR > others
 	var sql = "SELECT IA.itemID FROM itemAttachments IA NATURAL JOIN items I "
 		+ `LEFT JOIN itemData ID ON (IA.itemID=ID.itemID AND fieldID=${urlFieldID}) `
 		+ "LEFT JOIN itemDataValues IDV ON (ID.valueID=IDV.valueID) "
 		+ `WHERE parentItemID=? AND linkMode NOT IN (${Zotero.Attachments.LINK_MODE_LINKED_URL}) `
 		+ "AND IA.itemID NOT IN (SELECT itemID FROM deletedItems) "
-		+ "ORDER BY contentType='application/pdf' DESC, value=? DESC, dateAdded ASC";
+		+ "ORDER BY CASE contentType "
+		+ "WHEN 'application/pdf' THEN 1 "
+		+ "WHEN 'application/epub+zip' THEN 2 "
+		+ "WHEN 'image/vnd.djvu' THEN 3 "
+		+ "WHEN 'application/x-mobipocket-ebook' THEN 4 "
+		+ "WHEN 'application/vnd.comicbook-rar' THEN 5 "
+		+ "WHEN 'application/x-cbr' THEN 6 "
+		+ "ELSE 7 END ASC, value=? DESC, dateAdded ASC";
 	var itemIDs = await Zotero.DB.columnQueryAsync(sql, [this.id, url]);
 	return this.ObjectsClass.get(itemIDs);
 };
@@ -3912,11 +3982,20 @@ Zotero.Item.prototype.getBestAttachmentState = async function () {
 	if (item.isPDFAttachment()) {
 		type = 'pdf';
 	}
-	else if (item.isSnapshotAttachment()) {
-		type = 'snapshot';
-	}
 	else if (item.isEPUBAttachment()) {
 		type = 'epub';
+	}
+	else if (item.isDJVUAttachment()) {
+		type = 'djvu';
+	}
+	else if (item.isMobiAttachment()) {
+		type = 'mobi';
+	}
+	else if (item.isCBRAttachment()) {
+		type = 'cbr';
+	}
+	else if (item.isSnapshotAttachment()) {
+		type = 'snapshot';
 	}
 	else if (item.isImageAttachment()) {
 		type = 'image';
@@ -3929,7 +4008,8 @@ Zotero.Item.prototype.getBestAttachmentState = async function () {
 	}
 	var exists = await item.fileExists();
 	let key = item.key;
-	return this._bestAttachmentState = { type, exists, key };
+	let size = item.attachmentFileSize;
+	return this._bestAttachmentState = { type, exists, key, size };
 };
 
 

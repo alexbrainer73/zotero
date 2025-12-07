@@ -1433,7 +1433,18 @@ var ItemTree = class ItemTree extends LibraryTree {
 			
 			case 'numNotes':
 				return row.numNotes(false, true) || 0;
-			
+
+			case 'attachmentSize':
+				// Return raw size in bytes for numeric sorting
+				if (item.isRegularItem() && this._canGetBestAttachmentState(item)) {
+					let state = item.getBestAttachmentStateCached();
+					return state && state.size ? state.size : 0;
+				}
+				else if (item.isFileAttachment()) {
+					return item.attachmentFileSize || 0;
+				}
+				return 0;
+
 			// Use unformatted part of date strings (YYYY-MM-DD) for sorting
 			case 'date':
 				var val = row.ref.getField('date', true, true);
@@ -3406,6 +3417,22 @@ var ItemTree = class ItemTree extends LibraryTree {
 			}
 		}
 		row.numNotes = treeRow.numNotes() || "";
+
+		// Get attachment size - for regular items, use best attachment size; for attachments, use own size
+		row.attachmentSize = "";
+		if (treeRow.ref.isRegularItem()) {
+			let state = treeRow.ref.getBestAttachmentStateCached();
+			if (state && state.size) {
+				row.attachmentSize = Zotero.Utilities.Internal.formatFileSize(state.size);
+			}
+		}
+		else if (treeRow.ref.isFileAttachment()) {
+			let size = treeRow.ref.attachmentFileSize;
+			if (size) {
+				row.attachmentSize = Zotero.Utilities.Internal.formatFileSize(size);
+			}
+		}
+
 		row.feed = (treeRow.ref.isFeedItem && Zotero.Feeds.get(treeRow.ref.libraryID).name) || "";
 		row.title = treeRow.ref.getDisplayTitle();
 		

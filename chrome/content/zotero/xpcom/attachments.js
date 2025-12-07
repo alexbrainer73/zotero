@@ -138,6 +138,16 @@ Zotero.Attachments = new function () {
 					attachmentItem.attachmentCharset = charset;
 				}
 				attachmentItem.attachmentPath = newFile.path;
+
+				// Calculate and store file size
+				try {
+					let fileInfo = await IOUtils.stat(newFile.path);
+					attachmentItem.attachmentFileSize = fileInfo.size;
+				}
+				catch (e) {
+					Zotero.logError("Failed to get file size: " + e);
+				}
+
 				if (title == undefined) {
 					attachmentItem.setAutoAttachmentTitle();
 				}
@@ -3294,9 +3304,28 @@ Zotero.Attachments = new function () {
 			attachmentItem.attachmentContentType = contentType;
 			attachmentItem.attachmentCharset = charset;
 			if (file) {
-				attachmentItem.attachmentPath = typeof file == 'string' ? file : file.path;
+				let filePath = typeof file == 'string' ? file : file.path;
+				attachmentItem.attachmentPath = filePath;
+
+				// Calculate and store file size for linked files
+				if (linkMode == self.LINK_MODE_LINKED_FILE) {
+					try {
+						// Resolve the path if it's a relative path
+						let resolvedPath = filePath;
+						if (filePath.startsWith(self.BASE_PATH_PLACEHOLDER)) {
+							resolvedPath = self.resolveRelativePath(filePath);
+						}
+						if (resolvedPath && (await IOUtils.exists(resolvedPath))) {
+							let fileInfo = await IOUtils.stat(resolvedPath);
+							attachmentItem.attachmentFileSize = fileInfo.size;
+						}
+					}
+					catch (e) {
+						Zotero.logError("Failed to get file size for linked file: " + e);
+					}
+				}
 			}
-			
+
 			if (collections) {
 				attachmentItem.setCollections(collections);
 			}

@@ -57,6 +57,10 @@
 							<html:div class="meta-label"><html:label id="pages-label" class="key" data-l10n-id="attachment-info-pages"/></html:div>
 							<html:div class="meta-data"><editable-text id="pages" aria-labelledby="pages-label" nowrap="true" tight="true" readonly="true"/></html:div>
 						</html:div>
+						<html:div id="fileSizeRow" class="meta-row">
+							<html:div class="meta-label"><html:label id="fileSize-label" class="key" data-l10n-id="attachment-info-size"/></html:div>
+							<html:div class="meta-data"><editable-text id="fileSize" aria-labelledby="fileSize-label" nowrap="true" tight="true" readonly="true"/></html:div>
+						</html:div>
 						<html:div id="dateModifiedRow" class="meta-row" hidden="true" >
 							<html:div class="meta-label"><html:label id="dateModified-label" class="key" data-l10n-id="attachment-info-modified"/></html:div>
 							<html:div class="meta-data"><editable-text id="dateModified" aria-labelledby="dateModified-label" nowrap="true" tight="true" readonly="true"/></html:div>
@@ -125,6 +129,7 @@
 			this.clickableLink = false;
 			this.displayAccessed = false;
 			this.displayPages = false;
+			this.displayFileSize = false;
 			this.displayDateModified = false;
 			this.displayIndexed = false;
 			this.displayNote = false;
@@ -136,17 +141,19 @@
 					this.clickableLink = true;
 					this.displayAccessed = true;
 					this.displayPages = true;
+					this.displayFileSize = true;
 					this.displayIndexed = true;
 					this.displayNote = true;
 					this.displayDateModified = true;
 					break;
-				
+
 				case 'edit':
 					this.displayURL = true;
 					this.displayFileName = true;
 					this.clickableLink = true;
 					this.displayAccessed = true;
 					this.displayPages = true;
+					this.displayFileSize = true;
 					this.displayIndexed = true;
 					this.displayNote = true;
 					this.displayDateModified = true;
@@ -465,7 +472,23 @@
 			else {
 				pagesRow.hidden = true;
 			}
-			
+
+			// File size
+			let fileSizeRow = this._id("fileSizeRow");
+			if (this.displayFileSize && this._item.isFileAttachment()) {
+				let size = this._item.attachmentFileSize;
+				if (size !== null && size !== undefined) {
+					this._id("fileSize").value = Zotero.Utilities.Internal.formatFileSize(size);
+					fileSizeRow.hidden = false;
+				}
+				else {
+					fileSizeRow.hidden = true;
+				}
+			}
+			else {
+				fileSizeRow.hidden = true;
+			}
+
 			if (this.displayDateModified && (fileExists || isMerge) && !this._item.isWebAttachment()) {
 				// Conflict resolution uses a modal window, so promises won't work, but
 				// the sync process passes in the file mod time as dateModified
